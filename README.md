@@ -62,5 +62,9 @@ pip install -r requirements.txt
 python ez-file-searcher.py
 ```
 ## 📸 Screenshots
+
+<img width="1096" height="681" alt="image" src="https://github.com/user-attachments/assets/0388cf9c-fe30-40ba-b4df-cbd135770e19" />
+
+
 <img width="1097" height="683" alt="image" src="https://github.com/user-attachments/assets/ef603498-c437-4928-9f5e-bc5129c82f26" />
 
