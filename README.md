@@ -1,4 +1,4 @@
-# EZ-FileSearcher 🔍
+# 🔍 EZ-FileSearcher (v1.0)
 
 **Version:** 1.0  
 
