@@ -47,10 +47,16 @@ class EZFileSearcherApp(ctk.CTk):
         self.btn_browse = ctk.CTkButton(self.top_frame, text="Select Folder", command=self.browse_folder, width=120)
         self.btn_browse.pack(side="left", padx=(0, 10))
 
-        self.entry_path = ctk.CTkEntry(self.top_frame, textvariable=self.selected_folder, state="readonly", width=300)
+        # 1. Update the Folder Box (Removed textvariable & readonly)
+        self.entry_path = ctk.CTkEntry(self.top_frame, 
+                                       placeholder_text="Target directory path...", 
+                                       width=300)
         self.entry_path.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
-        self.entry_search = ctk.CTkEntry(self.top_frame, textvariable=self.search_term, placeholder_text="Enter text to search...", width=250)
+        # 2. Update the Search Box (Removed textvariable)
+        self.entry_search = ctk.CTkEntry(self.top_frame, 
+                                         placeholder_text="Search document contents...", 
+                                         width=250)
         self.entry_search.pack(side="left", padx=(0, 10))
         self.entry_search.bind("<Return>", lambda event: self.start_search())
 
@@ -111,11 +117,12 @@ class EZFileSearcherApp(ctk.CTk):
     def browse_folder(self):
         folder = ctk.filedialog.askdirectory(title="Select Folder to Search")
         if folder:
-            self.selected_folder.set(folder)
+            self.entry_path.delete(0, "end") # Clear any existing text
+            self.entry_path.insert(0, folder) # Insert the new folder path
 
     def start_search(self):
-        folder = self.selected_folder.get()
-        term = self.search_term.get().strip()
+        folder = self.entry_path.get().strip()   # Grab text straight from UI
+        term = self.entry_search.get().strip()   # Grab text straight from UI
 
         if not folder or not term:
             messagebox.showwarning("Missing Information", "Please select a folder and enter a search term.")
@@ -243,7 +250,7 @@ class EZFileSearcherApp(ctk.CTk):
         self.preview_label.configure(text=f"Preview: {os.path.basename(filepath)}")
         
         content = self.results_data[filepath]["content"]
-        term = self.search_term.get()
+        term = self.entry_search.get().strip()
 
         self.textbox_preview.delete("1.0", "end")
         self.textbox_preview.insert("1.0", content)
