@@ -1,4 +1,4 @@
-# EZ-FileSearcher Pro 🔍
+# EZ-FileSearcher 🔍
 
 **Version:** 1.0  
 
