@@ -1,6 +1,8 @@
 # 🔍 EZ-FileSearcher (v1.0)
 
-**Version:** 1.0  
+![Version](https://img.shields.io/badge/version-1.0-blue.svg)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 EZ-FileSearcher Pro is a lightning-fast, highly visual desktop application built in Python. It solves the frustration of slow, inaccurate OS-level file searches by allowing users to deeply scan the text *inside* hundreds of documents instantly. 
 
