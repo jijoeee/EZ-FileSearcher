@@ -3,6 +3,7 @@ import threading
 import subprocess
 import sys
 import time
+import textwrap
 import customtkinter as ctk
 from tkinter import messagebox
 
@@ -21,7 +22,7 @@ class EZFileSearcherApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("EZ-FileSearcher v1.0")
+        self.title("EZ-FileSearcher v1.1")
         self.geometry("1100x650")
         self.minsize(800, 500)
 
@@ -36,6 +37,8 @@ class EZFileSearcherApp(ctk.CTk):
         self.search_start_time = 0
         self.current_match_indices = [] 
         self.current_match_position = 0 
+        
+        self.cancel_search = False # <-- ADD THIS CANCEL FLAG
 
         self.setup_ui()
 
@@ -61,7 +64,7 @@ class EZFileSearcherApp(ctk.CTk):
         self.entry_search.bind("<Return>", lambda event: self.start_search())
 
         self.btn_search = ctk.CTkButton(self.top_frame, text="Search", command=self.start_search, width=100)
-        self.btn_search.pack(side="left")
+        self.btn_search.pack(side="left", padx=(0, 10)) # <-- Added 10px padding on the right
 
         # --- Main Body (Left Panel + Right Panel) ---
         self.main_frame = ctk.CTkFrame(self)
@@ -101,7 +104,7 @@ class EZFileSearcherApp(ctk.CTk):
         self.btn_open_file = ctk.CTkButton(self.right_panel, text="Open File", command=self.open_current_file, state="disabled")
         self.btn_open_file.pack(side="bottom", anchor="e", padx=10, pady=(0, 10))
 
-        # --- NEW: Bottom Status Bar w/ Progress ---
+       # --- NEW: Bottom Status Bar w/ Progress ---
         self.status_container = ctk.CTkFrame(self, fg_color="transparent")
         self.status_container.pack(side="bottom", fill="x", padx=10, pady=(0, 5))
 
@@ -109,10 +112,13 @@ class EZFileSearcherApp(ctk.CTk):
         self.status_label = ctk.CTkLabel(self.status_container, textvariable=self.status_var, anchor="w", text_color="gray")
         self.status_label.pack(side="left")
 
+        # 1. Add the Cancel button here (Notice we do NOT use .pack() yet!)
+        self.btn_cancel = ctk.CTkButton(self.status_container, text="Cancel", command=self.trigger_cancel, 
+                                        width=70, height=24, fg_color="#b30000", hover_color="#800000")
+
         self.progress_bar = ctk.CTkProgressBar(self.status_container, width=200)
         self.progress_bar.set(0) # 0 to 1 scale
-        self.progress_bar.pack(side="right", pady=5)
-        self.progress_bar.pack_forget() # Hide it initially until search starts
+        self.progress_bar.pack_forget() # Hide it initially
 
     def browse_folder(self):
         folder = ctk.filedialog.askdirectory(title="Select Folder to Search")
@@ -136,6 +142,7 @@ class EZFileSearcherApp(ctk.CTk):
         self.status_var.set("Pre-scanning folder...")
         
         # Reset UI
+        self.cancel_search = False # Make sure this is reset!
         self.results_data.clear()
         self.current_preview_file = None
         self.textbox_preview.delete("1.0", "end")
@@ -143,14 +150,28 @@ class EZFileSearcherApp(ctk.CTk):
         self.match_nav_label.configure(text="")
         self.btn_up.configure(state="disabled")
         self.btn_down.configure(state="disabled")
+        
+        # 2. Show the progress bar AND the Cancel button
+        self.btn_cancel.configure(text="Cancel", state="normal")
+        self.btn_cancel.pack(side="right", padx=(10, 0)) # Pack cancel button on far right
         self.progress_bar.set(0)
-        self.progress_bar.pack(side="right", pady=5) # Show progress bar
+        self.progress_bar.pack(side="right", pady=5) # Pack progress bar beside it
 
         for widget in self.left_panel.winfo_children():
             widget.destroy()
 
         thread = threading.Thread(target=self.run_search_thread, args=(folder, term), daemon=True)
         thread.start()
+
+    # UPDATE inside start_search(): Right after self.is_searching = True, add these two lines:
+    # self.cancel_search = False
+    # self.btn_cancel.configure(state="normal", text="Cancel")
+
+    def trigger_cancel(self):
+        if self.is_searching:
+            self.cancel_search = True
+            self.btn_cancel.configure(state="disabled", text="Stopping...")
+            self.status_var.set("Canceling search... (finishing current file)")
 
     def read_file_content(self, filepath):
         ext = os.path.splitext(filepath)[1].lower()
@@ -190,6 +211,7 @@ class EZFileSearcherApp(ctk.CTk):
         # PHASE 1: Lightning Pre-Scan to count files
         target_files = []
         for root, dirs, files in os.walk(folder):
+            if self.cancel_search: break # <-- ADD THIS LINE
             for file in files:
                 if file.lower().endswith(exts):
                     target_files.append(os.path.join(root, file))
@@ -202,6 +224,7 @@ class EZFileSearcherApp(ctk.CTk):
         # PHASE 2: Deep Scan with Progress Tracking
         total_matches = 0
         for index, filepath in enumerate(target_files):
+            if self.cancel_search: break # <-- ADD THIS LINE
             content = self.read_file_content(filepath)
             if content:
                 match_count = content.lower().count(term_lower)
@@ -226,17 +249,48 @@ class EZFileSearcherApp(ctk.CTk):
         self.status_var.set(f"Searching: {percent}% ({current}/{total} files processed)")
 
     def add_result_button(self, filepath, count):
-        btn = ctk.CTkButton(self.left_panel, text=f"{os.path.basename(filepath)} ({count} matches)", 
-                            anchor="w", fg_color="transparent", text_color=("gray10", "gray90"),
-                            hover_color=("gray70", "gray30"), command=lambda p=filepath: self.show_preview(p))
-        btn.pack(side="top", fill="x", pady=2)
+        filename = os.path.basename(filepath)
+        display_text = f"{filename} ({count} matches)"
+        
+        # Wrap the text at 33 characters (fits nicely in 300px panel)
+        wrapped_text = textwrap.fill(display_text, width=33)
+        
+        # Create a container frame that acts as our "button" background
+        btn_frame = ctk.CTkFrame(self.left_panel, fg_color="transparent", cursor="hand2")
+        btn_frame.pack(side="top", fill="x", pady=2)
+        
+        # Create a Label inside the frame (Labels DO support justify="left")
+        lbl = ctk.CTkLabel(btn_frame, text=wrapped_text, justify="left", anchor="w", 
+                           text_color=("gray10", "gray90"))
+        lbl.pack(side="left", fill="x", expand=True, padx=8, pady=4)
+        
+        # Create manual hover and click events
+        def on_enter(e): btn_frame.configure(fg_color=("gray70", "gray30"))
+        def on_leave(e): btn_frame.configure(fg_color="transparent")
+        def on_click(e, p=filepath): self.show_preview(p)
+        
+        # Bind the events to both the frame AND the label so it feels like one solid button
+        btn_frame.bind("<Enter>", on_enter)
+        btn_frame.bind("<Leave>", on_leave)
+        btn_frame.bind("<Button-1>", on_click)
+        lbl.bind("<Enter>", on_enter)
+        lbl.bind("<Leave>", on_leave)
+        lbl.bind("<Button-1>", on_click)
 
     def finish_search(self, files_scanned, total_matches, term):
         self.is_searching = False
         self.btn_search.configure(state="normal", text="Search")
-        self.progress_bar.pack_forget() # Hide progress bar when done
+        
+        # 3. Hide both widgets when finished
+        self.progress_bar.pack_forget() 
+        self.btn_cancel.pack_forget()   
+        
         elapsed_time = time.time() - self.search_start_time 
         
+        if self.cancel_search:
+            self.status_var.set(f"Search CANCELED. Found {total_matches} matches so far. ({elapsed_time:.2f}s)")
+            return
+
         if not self.results_data:
             self.status_var.set(f"No files found for '{term}' (Scanned {files_scanned} files in {elapsed_time:.2f}s)")
             lbl = ctk.CTkLabel(self.left_panel, text="No results found.", text_color="gray")
